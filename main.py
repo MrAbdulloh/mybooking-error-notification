@@ -1,27 +1,21 @@
 import asyncio
-
 import requests
 from aiogram import Bot, Dispatcher, executor
 from aiogram.types import Message
-
-from logger import setup_logger
 
 API_TOKEN = '5519984673:AAG9VKRQBB-c08Q04XPRN0zHELh90HGyyWY'
 CHAT_ID = '-1002245220290'
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
-logger = setup_logger()
 
-# Список сайтов
 username = "main24"
 password = "saas24"
-timeout = 5
 
 sites = [
     "https://mybooking.uz",
     f"https://{username}:{password}@oops.mybooking.uz",
-    "https://hotel.mybooking.uz"
+    "https://hotel.mybooking.uz",
 ]
 
 monitoring_task = None
@@ -29,10 +23,8 @@ monitoring_task = None
 
 async def send_request(url):
     try:
-        response = requests.get(url, timeout=timeout)
+        response = await asyncio.to_thread(requests.get, url)
         return response.status_code == 200, response
-    except requests.Timeout as e:
-        return False, f"Timeout: {str(e)}"
     except requests.RequestException as e:
         return False, f"Request Exception: {str(e)}"
     except Exception as e:
@@ -41,25 +33,20 @@ async def send_request(url):
 
 async def check_site(url):
     for attempt in range(1, 4):
-        logger.info(f"{url}: {attempt}-й запрос отправляется...")
         success, response = await send_request(url)
         if success:
-            logger.info(f"{url}: {attempt}-й запрос успешен!")
             return True
-        logger.warning(f"{url}: {attempt}-й запрос завершился таймаутом или ошибкой.")
     return response
 
 
 async def monitor_requests():
     global monitoring_task
     while True:
-        logger.info("Началась проверка...")
         for url in sites:
             error_info = await check_site(url)
             if error_info is not True:
-                logger.error(f"{url}: Все 3 запроса не удались. Отправляем сообщение в Telegram...")
-                error_msg = (f"Ошибка\n: {url} завершился таймаутом или ошибкой.\n\n"
-                             f"Детали\n: {error_info}")
+                error_msg = (f"Ошибка:\n {url} завершился ошибкой.\n\n"
+                             f"Детали:\n {error_info}")
                 await bot.send_message(CHAT_ID, error_msg)
         await asyncio.sleep(10)
 
